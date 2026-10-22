@@ -50,3 +50,57 @@ def test_completed_tasks_do_not_conflict():
     assert len(scheduler.detect_conflicts()) == 1
     walk.mark_complete()
     assert scheduler.detect_conflicts(owner.get_all_tasks()) == []
+
+def test_sort_by_time_orders_chronologically():
+    owner = Owner(name="Alex")
+    pet = Pet(name="Buddy", species="Dog")
+    owner.add_pet(pet)
+    for t in ["18:00", "7:30", "12:15"]:
+        pet.add_task(Task(description=f"Task {t}", time=t, frequency="Once"))
+    times = [task.time for task in Scheduler(owner).sort_by_time()]
+    assert times == ["07:30", "12:15", "18:00"]
+
+def test_filter_by_pet_and_status():
+    owner = Owner(name="Alex")
+    dog, cat = Pet(name="Buddy", species="Dog"), Pet(name="Whiskers", species="Cat")
+    owner.add_pet(dog)
+    owner.add_pet(cat)
+    walk = Task(description="Walk", time="08:00", frequency="Once")
+    feed = Task(description="Feed", time="09:00", frequency="Once")
+    dog.add_task(walk)
+    cat.add_task(feed)
+    walk.mark_complete()
+    scheduler = Scheduler(owner)
+    assert scheduler.filter_tasks(pet_name="buddy") == [walk]
+    assert scheduler.filter_tasks(completed=False) == [feed]
+
+def test_weekly_task_recurs_in_seven_days():
+    from datetime import date
+    task = Task(description="Bath", time="10:00", frequency="Weekly", due_date=date(2026, 1, 1))
+    assert task.mark_complete().due_date == date(2026, 1, 8)
+
+def test_same_time_slot_conflict_warning():
+    owner = Owner(name="Alex")
+    dog, cat = Pet(name="Buddy", species="Dog"), Pet(name="Whiskers", species="Cat")
+    owner.add_pet(dog)
+    owner.add_pet(cat)
+    dog.add_task(Task(description="Walk", time="08:00", frequency="Once"))
+    cat.add_task(Task(description="Feed", time="08:00", frequency="Once"))
+    warnings = Scheduler(owner).detect_conflicts()
+    assert len(warnings) == 1 and "08:00" in warnings[0]
+
+def test_invalid_inputs_raise_value_error():
+    import pytest
+    for bad_time in ["8am", "25:00", "12:60", 800]:
+        with pytest.raises(ValueError):
+            Task(description="Walk", time=bad_time)
+    with pytest.raises(ValueError):
+        Task(description="  ", time="08:00")
+    owner = Owner(name="Alex")
+    owner.add_pet(Pet(name="Buddy", species="Dog"))
+    with pytest.raises(ValueError):
+        owner.add_pet(Pet(name="buddy", species="Cat"))
+    task = Task(description="Walk", time="08:00")
+    task.mark_complete()
+    with pytest.raises(ValueError):
+        task.mark_complete()

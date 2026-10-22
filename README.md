@@ -44,33 +44,7 @@ pip install -r requirements.txt
 
 ## 🖥️ Sample Output
 
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
-============================= test session starts =============================
-platform win32 -- Python 3.10.x, pytest-7.x.x, pluggy-1.x.x
-rootdir: C:\...\ai110-module2show-pawpal-starter
-collected 3 items
-
-tests/test_pawpal.py ...                                                 [passing]
-============================== 3 passed in 0.05s ==============================
-```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
-```
-
-## 🧪 Testing PawPal+
-
-```bash
-# Run the full test suite:
-pytest
-
-# Run with coverage:
-pytest --cov
-```
-
-Sample test output:
+Running `python main.py` prints the owner's tasks across all pets:
 
 ```
 --- Today's Schedule ---
@@ -79,16 +53,48 @@ Sample test output:
 - [Whiskers] Feed Breakfast at 07:30 (Completed: False)
 ```
 
-## 📐 Smarter Scheduling
+## 🧪 Testing PawPal+
 
-> Fill in once you've implemented scheduling logic.
+```bash
+# Run the full test suite:
+python -m pytest
+
+# Run with coverage:
+python -m pytest --cov
+```
+
+All **10/10 tests pass**:
+
+```
+tests/test_pawpal.py::test_mark_complete PASSED                          [ 10%]
+tests/test_pawpal.py::test_add_task PASSED                               [ 20%]
+tests/test_pawpal.py::test_one_time_frequency_alias PASSED               [ 30%]
+tests/test_pawpal.py::test_completing_daily_task_schedules_next_day PASSED [ 40%]
+tests/test_pawpal.py::test_completed_tasks_do_not_conflict PASSED        [ 50%]
+tests/test_pawpal.py::test_sort_by_time_orders_chronologically PASSED    [ 60%]
+tests/test_pawpal.py::test_filter_by_pet_and_status PASSED               [ 70%]
+tests/test_pawpal.py::test_weekly_task_recurs_in_seven_days PASSED       [ 80%]
+tests/test_pawpal.py::test_same_time_slot_conflict_warning PASSED        [ 90%]
+tests/test_pawpal.py::test_invalid_inputs_raise_value_error PASSED       [100%]
+============================= 10 passed in 0.10s ==============================
+```
+
+What the tests cover:
+
+- **Core behavior:** marking tasks complete and adding tasks to a pet.
+- **Sorting and filtering:** chronological ordering (including un-padded times like `7:30`), and filtering by pet name (case-insensitive) and completion status.
+- **Recurrence:** Daily tasks recur 1 day later, Weekly tasks 7 days later, and `"One-time"` normalizes to `"Once"` and does not recur.
+- **Conflicts:** two tasks at the same time produce a warning, and completed tasks are ignored.
+- **Edge cases:** invalid time formats (`"8am"`, `"25:00"`, `"12:60"`, non-string `800`), blank descriptions, duplicate pet names (case-insensitive), and completing a task twice all raise `ValueError`.
+
+## 📐 Smarter Scheduling
 
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `Scheduler.sort_by_time()` | Sorts chronologically by due date, then start time. Times are normalized to zero-padded `HH:MM` and compared as minutes after midnight, so `7:30` sorts before `12:15`. |
+| Filtering | `Scheduler.filter_tasks()` | Filters by any combination of pet name (case-insensitive), completion status, and date. Omitted criteria are ignored. |
+| Conflict handling | `Scheduler.detect_conflicts()` | Checks only active (incomplete) tasks. Flags exact time-slot collisions and overlapping duration windows on the same day, returning a readable warning per conflicting pair instead of raising. |
+| Recurring tasks | `Task.mark_complete()`, `Scheduler.complete_task()` | Completing a Daily or Weekly task uses `timedelta` to create the next occurrence 1 or 7 days later, and `Scheduler.complete_task()` adds it to the pet. Frequencies like `"One-time"` normalize to `"Once"`, which does not recur. Completing an already-completed task raises `ValueError` so no duplicate occurrence is created. |
 
 ## 📸 Demo Walkthrough
 

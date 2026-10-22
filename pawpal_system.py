@@ -13,6 +13,8 @@ FREQUENCY_ALIASES = {"One-time": "Once", "One time": "Once", "Onetime": "Once"}
 # normalizes the time string to "HH:MM" and validates it is a valid 24-hour time
 def _normalize_time(value: str) -> str:
     """Validate a "H:MM" or "HH:MM" string and return it zero-padded as "HH:MM"."""
+    if not isinstance(value, str):
+        raise ValueError(f"Time must be a string like HH:MM, got {value!r}")
     try:
         hours_text, minutes_text = value.strip().split(":")
         hours, minutes = int(hours_text), int(minutes_text)
@@ -39,6 +41,9 @@ class Task:
 
     def __post_init__(self) -> None:
         """Normalize and validate fields so sorting and comparisons are reliable."""
+        self.description = self.description.strip()
+        if not self.description:
+            raise ValueError("Task description cannot be empty")
         self.time = _normalize_time(self.time)
         self.priority = self.priority.strip().capitalize()
         self.frequency = self.frequency.strip().capitalize()
@@ -63,6 +68,9 @@ class Task:
 
     def mark_complete(self) -> Task | None:
         """Mark this task done; return the next occurrence for recurring tasks."""
+        # Completing twice would queue a duplicate next occurrence.
+        if self.completed:
+            raise ValueError(f"{self.description!r} is already completed")
         self.completed = True
         interval = FREQUENCY_DAYS[self.frequency]
         if interval is None:
@@ -93,8 +101,18 @@ class Pet:
     age: int = 0
     tasks: list[Task] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        """Reject blank names and negative ages."""
+        self.name = self.name.strip()
+        if not self.name:
+            raise ValueError("Pet name cannot be empty")
+        if self.age < 0:
+            raise ValueError("Pet age cannot be negative")
+
     def add_task(self, task: Task) -> None:
         """Attach a task to this pet."""
+        if task in self.tasks:
+            raise ValueError(f"{task.description!r} is already assigned to {self.name}")
         task.pet_name = self.name
         self.tasks.append(task)
 
@@ -120,6 +138,8 @@ class Owner:
     """A pet owner who manages one or more pets."""
 
     def __init__(self, name: str, available_minutes: int = 120) -> None:
+        if available_minutes < 0:
+            raise ValueError("Available minutes cannot be negative")
         self.name = name
         self.available_minutes = available_minutes
         self.pets: list[Pet] = []
