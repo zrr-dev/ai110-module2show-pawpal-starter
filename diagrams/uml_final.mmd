@@ -1,0 +1,60 @@
+classDiagram
+    class Owner {
+        +str name
+        +int available_minutes
+        +list~Pet~ pets
+        +add_pet(pet: Pet) None
+        +get_pet(name: str) Pet
+        +get_all_tasks() list~Task~
+        +to_dict() dict
+        +from_dict(data: dict)$ Owner
+        +save_to_json(path) None
+        +load_from_json(path)$ Owner
+    }
+
+    class Pet {
+        <<dataclass>>
+        +str name
+        +str species
+        +int age
+        +list~Task~ tasks
+        +add_task(task: Task) None
+        +get_tasks() list~Task~
+        +remove_task(task: Task) None
+        +complete_task(task: Task) Task
+        +to_dict() dict
+        +from_dict(data: dict)$ Pet
+    }
+
+    class Task {
+        <<dataclass>>
+        +str description
+        +str time
+        +int duration_minutes
+        +str priority
+        +str frequency
+        +date due_date
+        +bool completed
+        +str pet_name
+        +int start_minutes
+        +int end_minutes
+        +mark_complete() Task
+        +overlaps(other: Task) bool
+        +to_dict() dict
+        +from_dict(data: dict)$ Task
+    }
+
+    class Scheduler {
+        +Owner owner
+        +sort_by_time(tasks, by_priority) list~Task~
+        +filter_tasks(pet_name, completed, on_date) list~Task~
+        +detect_conflicts(tasks) list~str~
+        +find_next_available_slot(duration_minutes, tasks, on_date, earliest) str
+        +complete_task(task: Task) Task
+        +build_daily_plan(on_date) list~Task~
+    }
+
+    Owner "1" o-- "0..*" Pet : has
+    Pet "1" *-- "0..*" Task : has
+    Scheduler "1" --> "1" Owner : manages tasks via
+    Scheduler ..> Task : sorts / filters / checks conflicts across all pets

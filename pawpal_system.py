@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+import json
+from dataclasses import asdict, dataclass, field, replace
 from datetime import date, timedelta
+from pathlib import Path
 
 PRIORITY_RANK = {"High": 0, "Medium": 1, "Low": 2}
 FREQUENCY_DAYS = {"Once": None, "Daily": 1, "Weekly": 7}
@@ -91,6 +93,17 @@ class Task:
             and other.start_minutes < self.end_minutes
         )
 
+    def to_dict(self) -> dict:
+        """Return a JSON-safe dict of this task (the date as an ISO string)."""
+        data = asdict(self)
+        data["due_date"] = self.due_date.isoformat()
+        return data
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Task:
+        """Rebuild a task from to_dict() output, re-running all validation."""
+        return cls(**{**data, "due_date": date.fromisoformat(data["due_date"])})
+
 #creates a Pet class that has a name, species, age, and a list of tasks. It has methods to add, get, remove, and complete tasks.
 @dataclass
 class Pet:
@@ -133,6 +146,23 @@ class Pet:
             self.add_task(next_task)
         return next_task
 
+    def to_dict(self) -> dict:
+        """Return a JSON-safe dict of this pet and its tasks."""
+        return {
+            "name": self.name,
+            "species": self.species,
+            "age": self.age,
+            "tasks": [task.to_dict() for task in self.tasks],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Pet:
+        """Rebuild a pet and its tasks from to_dict() output."""
+        pet = cls(name=data["name"], species=data["species"], age=data["age"])
+        for task_data in data["tasks"]:
+            pet.add_task(Task.from_dict(task_data))
+        return pet
+
 #creates an Owner class that has a name, available minutes, and a list of pets. It has methods to add, get, and retrieve all tasks for the owner.
 class Owner:
     """A pet owner who manages one or more pets."""
@@ -161,6 +191,31 @@ class Owner:
         """Return every task across all of this owner's pets."""
         return [task for pet in self.pets for task in pet.get_tasks()]
 
+    def to_dict(self) -> dict:
+        """Return a JSON-safe dict of this owner, their pets, and all tasks."""
+        return {
+            "name": self.name,
+            "available_minutes": self.available_minutes,
+            "pets": [pet.to_dict() for pet in self.pets],
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> Owner:
+        """Rebuild an owner and everything they own from to_dict() output."""
+        owner = cls(name=data["name"], available_minutes=data["available_minutes"])
+        for pet_data in data["pets"]:
+            owner.add_pet(Pet.from_dict(pet_data))
+        return owner
+
+    def save_to_json(self, path: str | Path) -> None:
+        """Write this owner, their pets, and all tasks to a JSON file."""
+        Path(path).write_text(json.dumps(self.to_dict(), indent=2), encoding="utf-8")
+
+    @classmethod
+    def load_from_json(cls, path: str | Path) -> Owner:
+        """Load an owner saved by save_to_json(); raises FileNotFoundError if missing."""
+        return cls.from_dict(json.loads(Path(path).read_text(encoding="utf-8")))
+
 #creates a Scheduler class that organizes an owner's tasks by sorting, filtering, detecting conflicts, and planning. It has methods to sort tasks by time, filter tasks based on pet name, completion status, and date, detect conflicts between tasks, complete a task via its pet, and build a daily plan of open tasks based on priority and available time.
 class Scheduler:
     """Organizes an owner's tasks: sorting, filtering, conflict detection, planning."""
@@ -172,9 +227,19 @@ class Scheduler:
         """Return the given tasks, or all of the owner's tasks when none are given."""
         return self.owner.get_all_tasks() if tasks is None else list(tasks)
 
-    def sort_by_time(self, tasks: list[Task] | None = None) -> list[Task]:
-        """Return tasks ordered by date, then start time (earliest first)."""
-        return sorted(self._tasks(tasks), key=lambda t: (t.due_date, t.start_minutes))
+    def sort_by_time(
+        self, tasks: list[Task] | None = None, by_priority: bool = False
+    ) -> list[Task]:
+        """Return tasks ordered by date, then start time (earliest first).
+
+        With by_priority=True, tasks are grouped High -> Medium -> Low first,
+        and each group is then ordered by date and start time.
+        """
+        if by_priority:
+            key = lambda t: (PRIORITY_RANK[t.priority], t.due_date, t.start_minutes)
+        else:
+            key = lambda t: (t.due_date, t.start_minutes)
+        return sorted(self._tasks(tasks), key=key)
 
     def filter_tasks(
         self,
@@ -207,6 +272,37 @@ class Scheduler:
                         f"({second.duration_minutes} min)"
                     )
         return warnings
+
+    def find_next_available_slot(
+        self,
+        duration_minutes: int,
+        tasks: list[Task] | None = None,
+        on_date: date | None = None,
+        earliest: str = "00:00",
+    ) -> str | None:
+        """Return the earliest "HH:MM" at or after `earliest` where a task of this
+        length fits on the day without overlapping an open task, or None if the
+        day has no gap that long before midnight."""
+        if duration_minutes <= 0:
+            raise ValueError("Duration must be positive to find a slot")
+        day = on_date or date.today()
+        busy = [
+            task
+            for task in self.sort_by_time(self._tasks(tasks))
+            if task.due_date == day and not task.completed
+        ]
+        hours, minutes = _normalize_time(earliest).split(":")
+        candidate = int(hours) * 60 + int(minutes)
+        # Tasks are in start order, so each blocking task pushes the candidate
+        # past its end; once a task starts after the gap closes, the gap is free.
+        for task in busy:
+            if task.start_minutes >= candidate + duration_minutes:
+                break
+            # Zero-length tasks still claim their start minute (see Task.overlaps).
+            candidate = max(candidate, task.end_minutes, task.start_minutes + 1)
+        if candidate + duration_minutes > 24 * 60:
+            return None
+        return f"{candidate // 60:02d}:{candidate % 60:02d}"
 
     def complete_task(self, task: Task) -> Task | None:
         """Complete a task via its pet so recurring tasks get their next occurrence."""
