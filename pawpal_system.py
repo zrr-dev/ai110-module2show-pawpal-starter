@@ -7,6 +7,8 @@ from datetime import date, timedelta
 
 PRIORITY_RANK = {"High": 0, "Medium": 1, "Low": 2}
 FREQUENCY_DAYS = {"Once": None, "Daily": 1, "Weekly": 7}
+# Alternate spellings accepted for a frequency, mapped to their canonical name.
+FREQUENCY_ALIASES = {"One-time": "Once", "One time": "Once", "Onetime": "Once"}
 
 # normalizes the time string to "HH:MM" and validates it is a valid 24-hour time
 def _normalize_time(value: str) -> str:
@@ -40,6 +42,7 @@ class Task:
         self.time = _normalize_time(self.time)
         self.priority = self.priority.strip().capitalize()
         self.frequency = self.frequency.strip().capitalize()
+        self.frequency = FREQUENCY_ALIASES.get(self.frequency, self.frequency)
         if self.priority not in PRIORITY_RANK:
             raise ValueError(f"Priority must be one of {list(PRIORITY_RANK)}")
         if self.frequency not in FREQUENCY_DAYS:
@@ -169,10 +172,9 @@ class Scheduler:
         ]
 
     def detect_conflicts(self, tasks: list[Task] | None = None) -> list[str]:
-        """Return a warning message for each pair of overlapping tasks."""
-        if tasks is None:
-            tasks = self.filter_tasks(completed=False)
-        ordered = self.sort_by_time(tasks)
+        """Return a warning message for each pair of overlapping active (incomplete) tasks."""
+        active = [task for task in self._tasks(tasks) if not task.completed]
+        ordered = self.sort_by_time(active)
         warnings = []
         for i, first in enumerate(ordered):
             for second in ordered[i + 1 :]:
