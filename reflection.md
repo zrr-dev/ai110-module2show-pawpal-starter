@@ -7,10 +7,15 @@
 - Briefly describe your initial UML design.
 - What classes did you include, and what responsibilities did you assign to each?
 
+My initial UML design consists of four core classes: Owner, Pet, Task, and Scheduler. The Owner class manages owner details and holds a list of owned pets. The Pet class represents an individual pet and stores its specific attributes alongside a list of assigned care tasks. The Task class represents individual activities (e.g., feedings, walks) with properties for description, scheduled time, frequency, and completion status using Python dataclasses. Finally, the Scheduler class acts as the system's scheduling manager, retrieving tasks across all pets via the Owner object to aggregate, sort, and detect time conflicts.
+
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
+
+Yes, during implementation, the Scheduler class was updated to interact directly with the Owner class instead of working with the individual Pet instances. This change was made to ensure the scheduler could aggregate all tasks across multiple pets into a single daily timeline and accurately check for scheduling conflicts between different pets owned by the same person. Additionally, helper properties were added to safely parse string timestamps ("HH:MM") into comparable tuples for precise sorting.
+
 
 ---
 

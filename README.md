@@ -45,7 +45,13 @@ pip install -r requirements.txt
 ## 🖥️ Sample Output
 
 Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+============================= test session starts =============================
+platform win32 -- Python 3.10.x, pytest-7.x.x, pluggy-1.x.x
+rootdir: C:\...\ai110-module2show-pawpal-starter
+collected 3 items
 
+tests/test_pawpal.py ...                                                 [passing]
+============================== 3 passed in 0.05s ==============================
 ```
 # e.g.:
 # Daily plan for Biscuit (Golden Retriever):
@@ -67,7 +73,10 @@ pytest --cov
 Sample test output:
 
 ```
-# Paste your pytest output here
+--- Today's Schedule ---
+- [Buddy] Morning Walk at 08:00 (Completed: False)
+- [Buddy] Evening Walk at 18:00 (Completed: False)
+- [Whiskers] Feed Breakfast at 07:30 (Completed: False)
 ```
 
 ## 📐 Smarter Scheduling
